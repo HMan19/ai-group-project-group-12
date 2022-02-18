@@ -139,6 +139,7 @@ class Player(object):
         pass_card_hand = Player.remove_runs(self.card_hand)
         pass_chip_hand = self.chip_hand - 1
         
+        # Unevenly weights passing over taking to make the players pick up more
         take_value = sum(take_card_hand) - (Player.chip_weight(take_chip_hand) / 2) * take_chip_hand
         pass_value = sum(pass_card_hand) - Player.chip_weight(pass_chip_hand) * pass_chip_hand
         
