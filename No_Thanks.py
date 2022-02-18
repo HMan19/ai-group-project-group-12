@@ -81,7 +81,7 @@ class Player(object):
         chip_pool += 1
         
         print(f'{self.name} passes the ' + str(card_pool) + " and loses a chip.")
-        # print(f'{self.name} has ' + str(self.chip_hand) + ' chips remaining.')
+        print(f'{self.name} has ' + str(self.chip_hand) + ' chips remaining.')
         
     def rand_play(self, player, deck):
         """
@@ -130,22 +130,19 @@ class Player(object):
     def weighted_play(self, player, deck):
         global card_pool
         global chip_pool
-        
-        if self.chip_hand <= 0:
-            player.take_card(player, deck)
-        
+    
         take_card_hand = Player.remove_runs(self.card_hand + [card_pool])
         take_chip_hand = self.chip_hand + chip_pool
         pass_card_hand = Player.remove_runs(self.card_hand)
         pass_chip_hand = self.chip_hand - 1
         
         # Unevenly weights passing over taking to make the players pick up more
-        take_value = sum(take_card_hand) - (Player.chip_weight(take_chip_hand) / 2) * take_chip_hand
+        take_value = sum(take_card_hand) - (Player.chip_weight(take_chip_hand)/2) * take_chip_hand
         pass_value = sum(pass_card_hand) - Player.chip_weight(pass_chip_hand) * pass_chip_hand
         
         # print('take_value is '+str(take_value)+' and pass_value is '+str(pass_value))
         
-        if take_value <= pass_value:
+        if take_value <= pass_value or self.chip_hand <= 0:
             player.take_card(player, deck)
             
         else:
