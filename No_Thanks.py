@@ -1,4 +1,176 @@
 import random
+import numpy as np
+import pandas as pd
+import itertools
+
+def states():
+    
+    open_card_states = [x for x in range(3,13)]
+    open_chip_states = [x for x in range(6)]
+    player_chip_states = [x for x in range(1,11)]
+    player_cards_states = [x for x in range(553)]
+    """
+    player_cards_all = list()
+    
+    for i in range(10):
+        aux = [x for x in range(13)]
+        player_cards_all.append(aux)
+    player_cards_all = list(itertools.product(*player_cards_all))
+    player_cards_states = list()
+    
+    for i in range(len(player_cards_all)):
+        if (1 or 2) not in player_cards_all[i]:
+            player_cards_states.append(player_cards_all[i])
+     """      
+    states = [open_card_states, open_chip_states, player_chip_states, player_cards_states]
+    states = list(itertools.product(*states))
+    
+    return states
+        
+    
+def actions():
+    
+    actions_all = ["take", "pass"]
+    
+    return actions_all
+    
+def rewards(states, actions):
+    
+    R = np.zeros((len(states), len(actions)))
+    
+    R = pd.DataFrame(data = R, columns = actions, index = states)
+    
+    return R
+    
+class MonteCarloAgent(object):
+    
+    def agent_init(self, agent_init_info):
+        
+        self.states = states()
+        self.actions = actions()
+        self.state_seen = list()
+        self.action_seen = list()
+        self.q_seen = list()
+        
+        self.epsilon = agent_init_info["epsilon"]
+        self.step_size = agent_init_info["step_size"]
+        self.R = rewards(self.states, self.actions)
+        
+        self.q = pd.DataFrame(data = np.zeros((len(states),len(actions))), columns = self.actions, index = self.states)
+        self.visit = self.q.copy()
+        
+    def step(self, state_dict, actions_dict):
+        
+        state = [i for i in state_dict.values()]
+        state = tuple(state)
+        
+        if random.random() < self.epsilon:
+            actions_possible = [key for key,val in actions_dict.items() if val != 0]
+            action = random.choice(actions_possible)
+            
+        else:
+            actions_possible = [key for key,val in actions_dict.items() if val != 0]
+            random.shuffle(actions_possible)
+            val_max = 0
+            
+            for i in actions_possible:
+                val = self.q.loc[[state],i][0]
+                if val >= val_max:
+                    val_max = val
+                    action = i
+        
+        if ((state),action) not in self.q_seen:
+            self.state_seen.append(state)
+            self.action_seen.append(action)
+            
+        self.q_seen.append(((state),action))
+        self.visit.loc[[state], action] += 1
+        
+        return action
+    
+    def update(self, state_dict, action):
+        
+        state = [i for i in state_dict.values()]
+        state = tuple(state)
+        reward = self.R.loc[[state], action][0]
+        
+        for s,a in zip(self.state_seen, self.action_seen):
+            self.q.loc[[s], a] += self.step_size * (reward - self.q.loc[[s], a])
+            print(self.q.loc[[s],a])
+            
+        self.state_seen, self.action_seen, self.q_seen = list(), list(), list()
+        
+        
+class QLearningAgent(object):
+    
+    def agent_init(self, agent_init_info):
+        
+        self.states = states()
+        self.actions = actions()
+        self.prev_state = 0
+        self.prev_action = 0
+        
+        self.epsilon = agent_init_info["epsilon"]
+        self.step_size = agent_init_info["step_size"]
+        self.new_model = agent_init_info["new_model"]
+        self.R = rewards(self.states, self.actions)
+        
+        self.q = pd.DataFrame(data = np.zeros((len(states),len(actions))), columns = self.actions, index = self.states)
+        self.visit = self.q.copy()
+        
+    def step(self, state_dict, actions_dict):
+        
+        state = [i for i in state_dict.values()]
+        state = tuple(state)
+        
+        if random.random() < self.epsilon:
+            actions_possible = [key for key,val in actions_dict.items() if val != 0]
+            action = random.choice(actions_possible)
+            
+        else:
+            actions_possible = [key for key,val in actions_dict.items() if val != 0]
+            random.shuffle(actions_possible)
+            val_max = 0
+            
+            for i in actions_possible:
+                val = self.q.loc[[state],i][0]
+                if val >= val_max:
+                    val_max = val
+                    action = i
+            
+        self.q_seen.append(((state),action))
+        self.visit.loc[[state], action] += 1
+        
+        return action
+    
+    def update(self, state_dict, action):
+        
+        state = [i for i in state_dict.values()]
+        state = tuple(state)
+        
+        if self.prev_state != 0:
+            prev_q = self.q.loc[[self.prev_state], self.prev_action][0]
+            this_q = self.q.loc[[state], action][0]
+            reward = self.R.loc[[state], action][0]
+        
+            print("\n")
+            print(f'prev_q: {prev_q}')
+            print(f'this_q: {this_q}')
+            print(f'prev_state: {self.prev_state}')
+            print(f'this_state: {state}')
+            print(f'prev_action: {self.prev_action}')
+            print(f'this_action: {action}')
+            print(f'reward: {reward}')
+            
+            if reward == 0:
+                self.q.loc[[self.prev_state], self.prev_action] = prev_q + self.step_size * (reward + this_q - prev_q)
+            else:
+                self.q.loc[[self.prev_state], self.prev_action] = prev_q + self.step_size * (reward - prev_q)
+        
+            self.visit.loc[[self.prev_state], self.prev_action] += 1
+            
+        self.prev_state = state
+        self.prev_action = action
 
 # 1. Deck
 # ----------------------------------------------------------------------------
@@ -44,34 +216,31 @@ class Player(object):
         self.card_hand = list()
         self.chip_hand = 11
         
+        self.state = list()
+        self.actions = list()
+
     def draw_card(self, deck, player):
         global card_pool
         
         card_pool = deck.draw()
         print(f'{self.name} draws the number ' + str(card_pool) + ".")
         
-        player.weighted_play(player, deck)
+        player.rand_play(player, deck)
     
     def take_card(self, player, deck):
         global card_pool
         global chip_pool
-        global game_end
         
         self.card_hand.append(card_pool)
         self.chip_hand += chip_pool
-        
-        print(f'{self.name} takes the ' + str(card_pool) + " and " + str(chip_pool) + " chips.")
-        print(f'{self.name} has ' + str(self.chip_hand) + ' chips remaining.')
-        
         chip_pool = 0
         
-        if not deck.check_end():
+        print(f'{self.name} takes the ' + str(card_pool) + " and " + str(chip_pool) + " chips.")
+        
+        if deck.check_end() != True:
             player.draw_card(deck, player)
-        else:
-            game_end = True
         
     def pass_card(self):
-        
         global card_pool
         global chip_pool
         
@@ -79,7 +248,32 @@ class Player(object):
         chip_pool += 1
         
         print(f'{self.name} passes the ' + str(card_pool) + " and loses a chip.")
-        print(f'{self.name} has ' + str(self.chip_hand) + ' chips remaining.')
+        
+    def identify_state(self):
+        
+        for i in self.card_hand:
+            if i-1 in self.card_hand:
+                self.card_hand.remove(i)
+        
+        card_points = sum(self.card_hand)
+        
+        self.state = [card_pool, chip_pool, self.chip_hand, card_points]
+        
+    def identify_action(self):
+        
+        if self.chip_hand == 0:
+            self.actions = [1,0]
+        else:
+            self.actions = [1,1]
+        
+    def play_agent(self):
+        
+        self.identify_state()
+        self.identify_action()
+        
+        self.action = agent.step(self.state, self.actions)
+        
+        if self.action =         
         
     def rand_play(self, player, deck):
         """
@@ -88,7 +282,6 @@ class Player(object):
         """
         global chip_pool
         decision = random.randint(0,1)
-        
         
         if self.chip_hand == 0:
             decision == 0
@@ -99,58 +292,18 @@ class Player(object):
         if decision == 1:
             player.pass_card()
             
-    def remove_runs(player_hand):
-        player_hand.sort()
-        player_hand.reverse()
-        remove_list = []
-        
-        for i in player_hand:
-            if i-1 in player_hand:
-                remove_list.append(i)
-
-        for i in remove_list:
-            player_hand.remove(i)
-            
-        return player_hand
-    
     def point_tally(self):
-        self.card_hand = Player.remove_runs(self.card_hand)
+        self.card_hand.sort()
+        self.card_hand.reverse()
+        
+        for i in self.card_hand:
+            if i-1 in self.card_hand:
+                self.card_hand.remove(i)
+        
         card_points = sum(self.card_hand)
         chip_points = self.chip_hand
         return card_points - chip_points
     
-    def chip_weight(chip_count):
-        # Linear function mx + c such that chip_weight = 1 when chip_count = 1
-        # and chip_weight = 3 when chip_count = 11
-        return 0.2*chip_count + 0.8
-        
-    
-    def weighted_play(self, player, deck):
-        global card_pool
-        global chip_pool
-        
-        take_card_hand = Player.remove_runs(self.card_hand + [card_pool])
-        take_chip_hand = self.chip_hand + chip_pool
-        pass_card_hand = Player.remove_runs(self.card_hand)
-        pass_chip_hand = self.chip_hand - 1
-        
-        take_value = sum(take_card_hand) - (Player.chip_weight(take_chip_hand) / 2) * take_chip_hand
-        pass_value = sum(pass_card_hand) - Player.chip_weight(pass_chip_hand) * pass_chip_hand
-        
-        # print('take_value is '+str(take_value)+' and pass_value is '+str(pass_value))
-        
-        
-        if take_value <= pass_value or self.chip_hand <=0:
-            player.take_card(player, deck)
-            
-        else:
-            player.pass_card()
-            
-        
-        
-        
-        
-        
     
 # 3. Game
 # ----------------------------------------------------------------------------
@@ -171,39 +324,26 @@ def Run_Game(player_1, player_2, player_3):
     turn_no = 1
     global card_pool
     global chip_pool 
-    global game_end
     """
     Global used as card_pool and chip_pool need to be updated each turn so
     cannot be reset between function calls.
     """
     card_pool = 0
     chip_pool = 0
-    game_end = False
-    random_start = True
-    if random_start:
-        turn_no = random.randint(1, 3)
-        if turn_no == 1:
-            Player_1.draw_card(deck, Player_1)
-        elif turn_no == 2:
-            Player_2.draw_card(deck, Player_2)
-        elif turn_no == 3:
-            Player_3.draw_card(deck, Player_3)
     
-    else:
-        turn_no = 1
-        Player_1.draw_card(deck, Player_1)
+    Player_1.draw_card(deck, Player_1)
     
-    while not game_end:
+    while deck.check_end() != True:
         turn_no += 1
         
         if turn_no % 3 == 1:
-            Player_1.weighted_play(Player_1, deck)
+            Player_1.rand_play(Player_1, deck)
             
         if turn_no % 3 == 2:
-            Player_2.weighted_play(Player_2, deck)
+            Player_2.rand_play(Player_2, deck)
             
         if turn_no % 3 == 0:
-            Player_3.weighted_play(Player_3, deck)
+            Player_3.rand_play(Player_3, deck)
             
     else:
         P1_total = Player_1.point_tally()
