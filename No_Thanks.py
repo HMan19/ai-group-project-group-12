@@ -5,23 +5,12 @@ import itertools
 
 def states():
     
-    open_card_states = [x for x in range(3,13)]
-    open_chip_states = [x for x in range(6)]
-    player_chip_states = [x for x in range(1,11)]
-    player_cards_states = [x for x in range(553)]
-    """
-    player_cards_all = list()
-    
-    for i in range(10):
-        aux = [x for x in range(13)]
-        player_cards_all.append(aux)
-    player_cards_all = list(itertools.product(*player_cards_all))
-    player_cards_states = list()
-    
-    for i in range(len(player_cards_all)):
-        if (1 or 2) not in player_cards_all[i]:
-            player_cards_states.append(player_cards_all[i])
-     """      
+    open_card_states = [-x for x in range(3,36)]
+    open_chip_states = [x for x in range(45)]
+    player_chip_states = [x for x in range(45)]
+    player_cards_states = [0]
+    player_cards_states.append([-x for x in range(3,553)])
+      
     states = [open_card_states, open_chip_states, player_chip_states, player_cards_states]
     states = list(itertools.product(*states))
     
@@ -56,13 +45,12 @@ class MonteCarloAgent(object):
         self.step_size = agent_init_info["step_size"]
         self.R = rewards(self.states, self.actions)
         
-        self.q = pd.DataFrame(data = np.zeros((len(states),len(actions))), columns = self.actions, index = self.states)
+        self.q = pd.DataFrame(data = np.zeros((len(self.states),len(self.actions))), columns = self.actions, index = self.states)
         self.visit = self.q.copy()
         
     def step(self, state_dict, actions_dict):
         
-        state = [i for i in state_dict.values()]
-        state = tuple(state)
+        state = tuple(state_dict)
         
         if random.random() < self.epsilon:
             actions_possible = [key for key,val in actions_dict.items() if val != 0]
@@ -115,13 +103,12 @@ class QLearningAgent(object):
         self.new_model = agent_init_info["new_model"]
         self.R = rewards(self.states, self.actions)
         
-        self.q = pd.DataFrame(data = np.zeros((len(states),len(actions))), columns = self.actions, index = self.states)
+        self.q = pd.DataFrame(data = np.zeros((len(self.states),len(self.actions))), columns = self.actions, index = self.states)
         self.visit = self.q.copy()
         
     def step(self, state_dict, actions_dict):
-        
-        state = [i for i in state_dict.values()]
-        state = tuple(state)
+
+        state = tuple(state_dict)
         
         if random.random() < self.epsilon:
             actions_possible = [key for key,val in actions_dict.items() if val != 0]
@@ -137,9 +124,6 @@ class QLearningAgent(object):
                 if val >= val_max:
                     val_max = val
                     action = i
-            
-        self.q_seen.append(((state),action))
-        self.visit.loc[[state], action] += 1
         
         return action
     
@@ -217,7 +201,7 @@ class Player(object):
         self.chip_hand = 11
         
         self.state = list()
-        self.actions = list()
+        self.actions = dict()
 
     def draw_card(self, deck, player):
         global card_pool
@@ -251,29 +235,30 @@ class Player(object):
         
     def identify_state(self):
         
-        for i in self.card_hand:
-            if i-1 in self.card_hand:
-                self.card_hand.remove(i)
-        
-        card_points = sum(self.card_hand)
-        
-        self.state = [card_pool, chip_pool, self.chip_hand, card_points]
+        card_points = self.card_point_tally()
+        self.state = [-card_pool, chip_pool, self.chip_hand, -card_points]
         
     def identify_action(self):
         
         if self.chip_hand == 0:
-            self.actions = [1,0]
+            self.actions = {"take":1,"pass":0}
         else:
-            self.actions = [1,1]
+            self.actions = {"take":1,"pass":1}
         
-    def play_agent(self):
+    def play_agent(self, player, deck):
         
         self.identify_state()
         self.identify_action()
         
         self.action = agent.step(self.state, self.actions)
         
-        if self.action =         
+        if self.action == "take":
+            player.take_card(player, deck)
+        else:
+            player.pass_card() 
+            
+        if algorithm == "q-learning":
+            agent.update(self.state, self.action)
         
     def rand_play(self, player, deck):
         """
@@ -292,15 +277,17 @@ class Player(object):
         if decision == 1:
             player.pass_card()
             
-    def point_tally(self):
-        self.card_hand.sort()
-        self.card_hand.reverse()
+    def card_point_tally(self):
         
         for i in self.card_hand:
             if i-1 in self.card_hand:
                 self.card_hand.remove(i)
         
-        card_points = sum(self.card_hand)
+        return sum(self.card_hand)
+            
+    def point_tally(self):
+        
+        card_points = self.card_point_tally()
         chip_points = self.chip_hand
         return card_points - chip_points
     
@@ -308,12 +295,23 @@ class Player(object):
 # 3. Game
 # ----------------------------------------------------------------------------
 
-def Run_Game(player_1, player_2, player_3):
+def Run_Game(player_1, player_2, player_3, algo, agent_info):
     """
     A game reflects an iteration of turns, until the deck emtpies and total
     points are tallied. Winner is then determined. Initialised with three
     players.
     """
+    
+    global agent, algorithm
+    
+    algorithm = algo
+    
+    if algo == "q-learning":
+        agent = QLearningAgent()
+    else:
+        agent = MonteCarloAgent()
+        
+    agent.agent_init(agent_info)
 
     Player_1 = Player(player_1)
     Player_2 = Player(player_2)
@@ -343,7 +341,7 @@ def Run_Game(player_1, player_2, player_3):
             Player_2.rand_play(Player_2, deck)
             
         if turn_no % 3 == 0:
-            Player_3.rand_play(Player_3, deck)
+            Player_3.play_agent(Player_3, deck)
             
     else:
         P1_total = Player_1.point_tally()
@@ -362,5 +360,7 @@ def Run_Game(player_1, player_2, player_3):
          
         elif min(P1_total, P2_total, P3_total) == P3_total:
              print(f'{Player_3.name} has won!!!')
+             
+agent_init_info = {"epsilon":0.2, "step_size":0.2, "new_model":True}
             
-Run_Game('Alice', 'Bob', 'Claire')  
+Run_Game('Alice', 'Bob', 'Charlie', "q-learning", agent_init_info)  
