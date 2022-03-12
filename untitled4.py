@@ -94,8 +94,8 @@ def rewards(states, actions, state_dict = state_dict()):
     R = np.zeros((len(states), len(actions)))
     
     for i in range(len(states)):
-        R[i][0] = states[i][2] + states[i][1] - card_point_tally([val for idx, val in enumerate(states[i]) if idx not in [1,2]])
-        R[i][1] = states[i][2] - card_point_tally(states[i][3:12]) - 1
+        R[i][0] = states[i][2] + states[i][1] + card_point_tally([val for idx, val in enumerate(states[i]) if idx not in [1,2]])
+        R[i][1] = states[i][2] + card_point_tally(states[i][3:12]) - 1
     
     R = pd.DataFrame(data = R, columns = actions, index = state_dict.values())
     
@@ -167,18 +167,18 @@ class MonteCarloAgent(object):
             val_max = 0
             
             for i in actions_possible:
-                val = self.q.loc[[state],i][0]
+                val = self.q.loc[state,i][0]
                 if val >= val_max:
                     val_max = val
                     action = i
         
         # (3) Add state-action pair if not seen in this simulation
-        if ((state),action) not in self.q_seen:
+        if (state,action) not in self.q_seen:
             self.state_seen.append(state)
             self.action_seen.append(action)
             
-        self.q_seen.append(((state),action))
-        self.visit.loc[[state], action] += 1
+        self.q_seen.append((state,action))
+        self.visit.loc[state, action] += 1
         
         return action
     
@@ -192,12 +192,12 @@ class MonteCarloAgent(object):
         
         state = [i for i in state_dict.values()]
         state = tuple(state)
-        reward = self.R.loc[[state], action][0]
+        reward = self.R.loc[state, action]
         
         # Update Q-values of all state-action pairs visited in the simulation
         for s,a in zip(self.state_seen, self.action_seen):
-            self.q.loc[[s], a] += self.step_size * (reward - self.q.loc[[s], a])
-            print(self.q.loc[[s],a])
+            self.q.loc[s, a] += self.step_size * (reward - self.q.loc[s, a])
+            print(self.q.loc[s,a])
             
         self.state_seen, self.action_seen, self.q_seen = list(), list(), list()
         
@@ -366,7 +366,7 @@ class Player(object):
         global card_pool
         global chip_pool
         
-        self.card_hand.append(card_pool)
+        self.card_hand.append(-card_pool)
         self.chip_hand += chip_pool
         
         chip_pool = 0
@@ -447,7 +447,7 @@ class Player(object):
         decision = random.randint(0,1)
         
         if self.chip_hand == 0:
-            decision == 0
+            decision = 0
         
         if decision == 0:
             player.take_card_rand(player, deck)
@@ -462,7 +462,7 @@ class Player(object):
         
         card_points = card_point_tally(self.card_hand)
         chip_points = self.chip_hand
-        return card_points - chip_points
+        return card_points + chip_points
     
     
 # 5. Game
@@ -512,13 +512,13 @@ class Game(object):
             P2_total = self.player_2.point_tally()
             P3_total = self.player_3.point_tally()
     
-            if min(P1_total, P2_total, -P3_total) == P1_total:
+            if max(P1_total, P2_total, -P3_total) == P1_total:
                 tally[0] += 1
                 
-            elif min(P1_total, P2_total, -P3_total) == P2_total:
+            elif max(P1_total, P2_total, -P3_total) == P2_total:
                  tally[1] += 1
              
-            elif min(P1_total, P2_total, -P3_total) == P3_total:
+            elif max(P1_total, P2_total, -P3_total) == P3_total:
                  tally[2] += 1
                  
 def Tournament(player_1, player_2, player_3, match_no, algo, agent_info):
@@ -538,6 +538,8 @@ def Tournament(player_1, player_2, player_3, match_no, algo, agent_info):
     
     for i in range(1, match_no+1):
         Game(player_1, player_2, player_3)
+        
+    print(tally)
              
 agent_init_info = {"epsilon":0.2, "step_size":0.2, "new_model":True}
             
