@@ -2,6 +2,7 @@ import random
 import numpy as np
 import pandas as pd
 import itertools
+import matplotlib.pyplot as plt
 
 # 1. State, Action and Reward
 # ----------------------------------------------------------------------------
@@ -165,9 +166,9 @@ class MonteCarloAgent(object):
             actions_possible = [key for key,val in actions_dict.items() if val != 0]
             random.shuffle(actions_possible)
             val_max = 0
-            
+        
             for i in actions_possible:
-                val = self.q.loc[state,i][0]
+                val = self.q.loc[state,i]
                 if val >= val_max:
                     val_max = val
                     action = i
@@ -268,6 +269,7 @@ class QLearningAgent(object):
             actions_possible = [key for key,val in actions_dict.items() if val != 0]
             random.shuffle(actions_possible)
             val_max = 0
+            action = "take"
             
             for i in actions_possible:
                 val = self.q.loc[state,i]
@@ -276,7 +278,7 @@ class QLearningAgent(object):
                     action = i
         
         return action
-    
+  
     def update(self, state_dict, action):
         """
         Updating Q-values according to Belman equation
@@ -506,21 +508,21 @@ class Game(object):
                 
             if turn_no % 3 == 0:
                 self.player_3.play_agent(self.player_3, deck)
-                
-        else:
-            P1_total = self.player_1.point_tally()
-            P2_total = self.player_2.point_tally()
-            P3_total = self.player_3.point_tally()
-    
-            if max(P1_total, P2_total, -P3_total) == P1_total:
-                tally[0] += 1
-                
-            elif max(P1_total, P2_total, -P3_total) == P2_total:
-                 tally[1] += 1
-             
-            elif max(P1_total, P2_total, -P3_total) == P3_total:
-                 tally[2] += 1
-                 
+        
+        
+        P1_total = self.player_1.point_tally()
+        P2_total = self.player_2.point_tally()
+        P3_total = self.player_3.point_tally()
+
+        if max(P1_total, P2_total, -P3_total) == P1_total:
+            tally[0] += 1
+            
+        elif max(P1_total, P2_total, -P3_total) == P2_total:
+            tally[1] += 1
+         
+        elif max(P1_total, P2_total, -P3_total) == -P3_total:
+            tally[2] += 1
+         
 def Tournament(player_1, player_2, player_3, match_no, algo, agent_info):
     
     global agent, algorithm, tally
@@ -538,12 +540,12 @@ def Tournament(player_1, player_2, player_3, match_no, algo, agent_info):
     
     for i in range(1, match_no+1):
         Game(player_1, player_2, player_3)
-        
+                
     print(tally)
              
 agent_init_info = {"epsilon":0.2, "step_size":0.2, "new_model":True}
             
-Tournament('Alice', 'Bob', 'Charlie', 100000, "q-learning", agent_init_info)
+Tournament('Alice', 'Bob', 'Charlie', 10000, "monte-carlo", agent_init_info)
             
             
             
